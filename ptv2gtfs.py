@@ -153,8 +153,14 @@ def process_stops(cur, config, schedule):
             else:
                 # 7D-Street Name/Other Street
                 m = re.match('(\w+)-(.*)', row["location_name"].strip())
-                stop_code = m.groups()[0]
-                stop_name = m.groups()[1]
+                try:
+                    stop_code = m.groups()[0]
+                    stop_name = m.groups()[1]
+                except:
+                    print ("Warning: tram stop entry in DB "\
+                        "seems to be missing stop code:- entering "\
+                        "with name as '%s'" % row["location_name"].strip())
+                    stop_name = row['location_name'].strip()
 
         else:
             stop_name = row['location_name'].strip()
