@@ -307,7 +307,9 @@ def process_data(inputdb, config, output):
     process_stops(cur, config, schedule)
     process_stoptimes(cur, config, schedule)
 
-    schedule.Validate()
+    accumulator = transitfeed.SimpleProblemAccumulator()
+    problemReporter = transitfeed.ProblemReporter(accumulator)
+    schedule.Validate(problems=problemReporter)
     schedule.WriteGoogleTransitFeed(output)
 
 if __name__ == "__main__":
