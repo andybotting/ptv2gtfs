@@ -238,36 +238,34 @@ def process_stoptime(cur, config, schedule, service_period, table):
     cur.execute("select * from "+ config['prefix'] + "_stops_" + table)
     for row in cur:
         route_id = str(row['line_id'])
-        route = [r for r in schedule.GetRouteList() if r.route_id == route_id][0]
-
         stop_id = str(row['stop_id'])
-        stop = [s for s in schedule.GetStopList() if s.stop_id == stop_id][0]
-
-        headsign = directions[int(row["direction"])] # Get the direction from the other table
         trip_id = str(row['run_id'])
+        headsign = directions[int(row["direction"])] # Get the direction from the other table
+        time = row["time"]
+        # Now use of Get() API of transitfeed to save search time.
+        route = schedule.GetRoute(route_id)
+
+        stop = schedule.GetStop(stop_id)
 
         # If the next time is past midnight, add more time to take it past 24 hours,
         # because GTFS requires it
-        time = row["time"]
         if time < last_time:
             if last_trip_id == trip_id:
                 time += 86400
         last_time = time
         last_trip_id = trip_id
 
-        trip_list = [t for t in schedule.GetTripList() if t.trip_id == trip_id]
-
-        # If we don't have an existing trip, create a new one
-        if trip_list:
-            trip = trip_list[0]
-        else:
+        try:
+            trip = schedule.GetTrip(trip_id)
+        except KeyError:    
+            # If we don't have an existing trip, create a new one and add
             trip = route.AddTrip(
                 schedule, 
                 headsign = headsign,
                 trip_id = trip_id,
                 service_period = service_period 
             )
-
+        
         # We know the stops times are in row order, so we'll
         # just make up the sequence here
         stop_seq = len(trip.GetStopTimes())
