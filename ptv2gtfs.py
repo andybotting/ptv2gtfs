@@ -268,7 +268,7 @@ def process_stoptime(cur, config, schedule, service_period, table):
         
         # We know the stops times are in row order, so we'll
         # just make up the sequence here
-        stop_seq = len(trip.GetStopTimes())
+        stop_seq = trip.GetCountStopTimes()
 
         # Not sure what we should do about this
         problems = None
