@@ -12,8 +12,8 @@ Requirements
    * [Google Transitfeed] [transitfeed]
    * A MetLink/PTV database (SQLite3 DB)
 
-This has only been tested on Linux using Python 2.7. It should probably work
-on any platform.
+This has only been tested on Linux and Mac OS X using Python 2.7. 
+It should probably work on any platform.
 
 Obtaining the data
 ------------------
@@ -60,9 +60,10 @@ The stops "Cotham Rd/Burke Rd" (ID 2695) and "1219 Burke Rd" (ID 2436) are
 The output zip file (tram_gtfs.zip) in this case is our resulting GTFS data
 file.
 
-*NOTE*: This script can take a really long time. For train timetable data, it
-takes approximately 10 minutes to process. Tram is roughly an hour and bus
-services will take a few hours. 
+Performance: This script can take up to 10 minutes to run on a large DB, such
+as Victoria's bus network.
+It will also require over 100MB of RAM (e.g., between 800MB - 1GB for the bus
+network).
 
 Once the data has been processed, you can use the schedule_viewer.py script
 provided with Google's Transitfeed package to visualise the data:

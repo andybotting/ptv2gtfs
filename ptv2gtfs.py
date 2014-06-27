@@ -55,6 +55,7 @@ SETTINGS = {
 
 def process_routes(cur, config, schedule):
     # Routes
+    print "..processing routes.."
     cur.execute("select * from " + config['prefix'] + "_lines")
     for row in cur:
 
@@ -125,10 +126,12 @@ def process_routes(cur, config, schedule):
         )
 
         schedule.AddRouteObject(route)
+    print "..done processing routes."
 
     
 
 def process_stops(cur, config, schedule):
+    print "..processing stops.."
     # Stops
     cur.execute("select * from "+ config['prefix'] + "_locations")
     for row in cur:
@@ -178,9 +181,10 @@ def process_stops(cur, config, schedule):
         )
 
         schedule.AddStopObject(stop)
-
+    print "..done processing stops."
 
 def process_stoptimes(cur, config, schedule):
+    print "..processing stoptimes.."
 
     timetables = []
 
@@ -190,7 +194,6 @@ def process_stoptimes(cur, config, schedule):
         # Table name is train_stops_monthur, so get the last part
         name = row['name'].split('_')[-1]
         timetables.append(name)
-
 
     for timetable in timetables:
 
@@ -219,7 +222,9 @@ def process_stoptimes(cur, config, schedule):
 
         schedule.AddServicePeriodObject(service_period, validate=False)
         process_stoptime(cur, config, schedule, service_period, timetable)
+    print "..done processing stoptimes."
 
+PROGRESS_INCS = 20
 
 def process_stoptime(cur, config, schedule, service_period, table):
     
@@ -235,32 +240,37 @@ def process_stoptime(cur, config, schedule, service_period, table):
     last_trip_id = 0
     last_time = 0
 
+    print "..Getting stops database entries.."
     cur.execute("select * from "+ config['prefix'] + "_stops_" + table)
-    for row in cur:
+    rows = cur.fetchall()
+    num_stop_times = len(rows)
+    print "..got %d stop times database entries.." % num_stop_times
+    inc_divisor = num_stop_times / float(PROGRESS_INCS)
+    next_inc_period = 1
+
+    print "..starting processing each stop time entry.."
+    for ii, row in enumerate(rows):
         route_id = str(row['line_id'])
-        route = [r for r in schedule.GetRouteList() if r.route_id == route_id][0]
-
         stop_id = str(row['stop_id'])
-        stop = [s for s in schedule.GetStopList() if s.stop_id == stop_id][0]
-
-        headsign = directions[int(row["direction"])] # Get the direction from the other table
         trip_id = str(row['run_id'])
+        headsign = directions[int(row["direction"])] # Get the direction from the other table
+        time = row["time"]
+        # Now use of Get() API of transitfeed to save search time.
+        route = schedule.GetRoute(route_id)
+        stop = schedule.GetStop(stop_id)
 
         # If the next time is past midnight, add more time to take it past 24 hours,
         # because GTFS requires it
-        time = row["time"]
         if time < last_time:
             if last_trip_id == trip_id:
                 time += 86400
         last_time = time
         last_trip_id = trip_id
 
-        trip_list = [t for t in schedule.GetTripList() if t.trip_id == trip_id]
-
-        # If we don't have an existing trip, create a new one
-        if trip_list:
-            trip = trip_list[0]
-        else:
+        try:
+            trip = schedule.GetTrip(trip_id)
+        except KeyError:    
+            # If we don't have an existing trip, create a new one and add
             trip = route.AddTrip(
                 schedule, 
                 headsign = headsign,
@@ -270,7 +280,7 @@ def process_stoptime(cur, config, schedule, service_period, table):
 
         # We know the stops times are in row order, so we'll
         # just make up the sequence here
-        stop_seq = len(trip.GetStopTimes())
+        stop_seq = trip.GetCountStopTimes()
 
         # Not sure what we should do about this
         problems = None
@@ -288,6 +298,12 @@ def process_stoptime(cur, config, schedule, service_period, table):
         )
 
         trip.AddStopTimeObject(stop_time)
+        if (ii+1) / inc_divisor > next_inc_period:
+            print "....processed %d stops (%.1f%% of total).." % \
+                (ii+1, next_inc_period/float(PROGRESS_INCS)*100)
+            next_inc_period += 1
+
+    print "..done processing each stop time entry.."
 
 
 def process_data(inputdb, config, output):
@@ -307,8 +323,14 @@ def process_data(inputdb, config, output):
     process_stops(cur, config, schedule)
     process_stoptimes(cur, config, schedule)
 
-    schedule.Validate()
+    accumulator = transitfeed.SimpleProblemAccumulator()
+    problemReporter = transitfeed.ProblemReporter(accumulator)
+    print "Validating result..."
+    schedule.Validate(problems=problemReporter)
+    print "...done."
+    print "Writing to file %s ..." % output
     schedule.WriteGoogleTransitFeed(output)
+    print "...done."
 
 if __name__ == "__main__":
 
